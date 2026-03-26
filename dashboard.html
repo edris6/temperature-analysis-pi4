@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ThermalWatch</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Syne:wght@400;700;800&display=swap');
+
+  :root {
+    --bg:       #0a0c10;
+    --surface:  #111318;
+    --border:   #1e2230;
+    --accent:   #ff4d00;
+    --warm:     #ff8c42;
+    --cool:     #42b4ff;
+    --mid:      #ffe066;
+    --text:     #e8eaf0;
+    --muted:    #555e75;
+    --glow:     rgba(255,77,0,0.18);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grain overlay */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none; z-index: 1000; opacity: 0.4;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.5rem 2.5rem;
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0;
+    background: rgba(10,12,16,0.92);
+    backdrop-filter: blur(12px);
+    z-index: 100;
+  }
+
+  .logo {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 1.4rem;
+    letter-spacing: -0.02em;
+  }
+  .logo span { color: var(--accent); }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+
+  .live-dot {
+    width: 8px; height: 8px;
+    background: #2ecc71;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 6px;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%,100% { box-shadow: 0 0 0 0 rgba(46,204,113,0.5); }
+    50%      { box-shadow: 0 0 0 6px rgba(46,204,113,0); }
+  }
+
+  main {
+    padding: 2rem 2.5rem 4rem;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  /* ── Hero temp ── */
+  .hero {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 2rem;
+    align-items: center;
+    margin-bottom: 3rem;
+    padding: 2rem 2.5rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero::after {
+    content: '';
+    position: absolute;
+    right: -80px; top: -80px;
+    width: 280px; height: 280px;
+    background: radial-gradient(circle, var(--glow) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .temp-big {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: clamp(4rem, 9vw, 7rem);
+    line-height: 1;
+    letter-spacing: -0.04em;
+    color: var(--accent);
+    text-shadow: 0 0 40px rgba(255,77,0,0.35);
+    transition: color 0.6s;
+  }
+  .temp-big .unit { font-size: 0.45em; color: var(--warm); vertical-align: super; }
+
+  .hero-meta { display: flex; flex-direction: column; gap: 0.5rem; }
+  .hero-meta .label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--muted);
+  }
+  .hero-meta .value { font-size: 0.95rem; color: var(--text); }
+
+  .status-bar {
+    grid-column: 1 / -1;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 0.5rem;
+  }
+  .status-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--cool), var(--mid), var(--warm), var(--accent));
+    border-radius: 2px;
+    transition: width 0.8s ease;
+  }
+
+  /* ── Stat cards ── */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2.5rem;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1.25rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    transition: border-color 0.2s;
+  }
+  .stat-card:hover { border-color: var(--accent); }
+
+  .stat-card .slabel {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--muted);
+  }
+  .stat-card .sval {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.8rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .sval.cold  { color: var(--cool); }
+  .sval.avg   { color: var(--mid); }
+  .sval.hot   { color: var(--accent); }
+  .stat-card .sdesc { font-size: 0.7rem; color: var(--muted); }
+
+  /* ── Charts ── */
+  .chart-section {
+    margin-bottom: 2.5rem;
+  }
+
+  .section-header {
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+  }
+  .section-header h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  .section-header .sub {
+    font-size: 0.7rem;
+    color: var(--muted);
+  }
+
+  .chart-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1.5rem;
+    position: relative;
+  }
+
+  .chart-wrap canvas { display: block; }
+
+  .loading {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--surface);
+    font-size: 0.8rem;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    border-radius: 4px;
+  }
+
+  /* ── Footer ── */
+  footer {
+    text-align: center;
+    font-size: 0.7rem;
+    color: var(--muted);
+    padding: 2rem;
+    border-top: 1px solid var(--border);
+    margin-top: 2rem;
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 600px) {
+    header { padding: 1rem 1.25rem; }
+    main   { padding: 1.25rem 1.25rem 3rem; }
+    .hero  { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Thermal<span>Watch</span></div>
+  <div class="header-right">
+    <span><span class="live-dot"></span>LIVE</span>
+    <span id="clock">—</span>
+    <span id="hostname">Pi 4B</span>
+  </div>
+</header>
+
+<main>
+
+  <!-- Hero -->
+  <div class="hero" id="hero">
+    <div class="temp-big" id="tempBig">—<span class="unit">°C</span></div>
+    <div class="hero-meta">
+      <div class="label">CPU Temperature</div>
+      <div class="value" id="heroTime">Last reading: —</div>
+      <div class="label" style="margin-top:0.5rem">Thermal status</div>
+      <div class="value" id="heroStatus">—</div>
+    </div>
+    <div class="status-bar" style="grid-column:1/-1">
+      <div class="status-fill" id="statusFill" style="width:0%"></div>
+    </div>
+  </div>
+
+  <!-- Stat cards -->
+  <div class="stats-row" id="statsRow24">
+    <div class="stat-card"><div class="slabel">24h Minimum</div><div class="sval cold" id="s24min">—</div><div class="sdesc">°C</div></div>
+    <div class="stat-card"><div class="slabel">24h Average</div><div class="sval avg"  id="s24avg">—</div><div class="sdesc">°C</div></div>
+    <div class="stat-card"><div class="slabel">24h Maximum</div><div class="sval hot"  id="s24max">—</div><div class="sdesc">°C</div></div>
+    <div class="stat-card"><div class="slabel">7-week Min</div><div class="sval cold"  id="s7wmin">—</div><div class="sdesc">°C</div></div>
+    <div class="stat-card"><div class="slabel">7-week Avg</div><div class="sval avg"   id="s7wavg">—</div><div class="sdesc">°C</div></div>
+    <div class="stat-card"><div class="slabel">7-week Max</div><div class="sval hot"   id="s7wmax">—</div><div class="sdesc">°C</div></div>
+  </div>
+
+  <!-- 24h chart -->
+  <div class="chart-section">
+    <div class="section-header">
+      <h2>Past 24 Hours</h2>
+      <span class="sub">5-minute buckets · min / avg / max</span>
+    </div>
+    <div class="chart-wrap">
+      <div class="loading" id="load24">Loading…</div>
+      <canvas id="chart24" height="100"></canvas>
+    </div>
+  </div>
+
+  <!-- 7 weeks chart -->
+  <div class="chart-section">
+    <div class="section-header">
+      <h2>Past 7 Weeks</h2>
+      <span class="sub">hourly buckets · min / avg / max</span>
+    </div>
+    <div class="chart-wrap">
+      <div class="loading" id="load7w">Loading…</div>
+      <canvas id="chart7w" height="90"></canvas>
+    </div>
+  </div>
+
+</main>
+
+<footer id="footer">ThermalWatch — Raspberry Pi 4B · readings every 30s</footer>
+
+<script>
+// ── Helpers ──────────────────────────────────────────────────────────────────
+const fmt = (n) => n != null ? n.toFixed(1) : '—';
+const fmtTime = (ts) => {
+  const d = new Date(ts * 1000);
+  return d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+};
+const fmtDate = (ts) => {
+  const d = new Date(ts * 1000);
+  return d.toLocaleDateString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'});
+};
+
+// ── Chart defaults ───────────────────────────────────────────────────────────
+Chart.defaults.color = '#555e75';
+Chart.defaults.borderColor = '#1e2230';
+Chart.defaults.font.family = "'JetBrains Mono', monospace";
+Chart.defaults.font.size = 11;
+
+function buildChart(id, labels, minData, avgData, maxData, xFmt) {
+  const ctx = document.getElementById(id).getContext('2d');
+
+  const band = {
+    id: 'band',
+    beforeDraw(chart) {
+      const {ctx: c, chartArea: {top, bottom, left, right}, scales: {x, y}} = chart;
+      const ds = chart.data.datasets;
+      if (!ds[0]?.data?.length) return;
+      c.save();
+      c.beginPath();
+      // max line points
+      ds[0].data.forEach((v, i) => {
+        const px = x.getPixelForValue(i), py = y.getPixelForValue(v);
+        i === 0 ? c.moveTo(px, py) : c.lineTo(px, py);
+      });
+      // min line points reversed
+      for (let i = ds[2].data.length - 1; i >= 0; i--) {
+        const px = x.getPixelForValue(i), py = y.getPixelForValue(ds[2].data[i]);
+        c.lineTo(px, py);
+      }
+      c.closePath();
+      const grad = c.createLinearGradient(left, top, left, bottom);
+      grad.addColorStop(0, 'rgba(255,77,0,0.10)');
+      grad.addColorStop(1, 'rgba(66,180,255,0.04)');
+      c.fillStyle = grad;
+      c.fill();
+      c.restore();
+    }
+  };
+
+  return new Chart(ctx, {
+    type: 'line',
+    plugins: [band],
+    data: {
+      labels,
+      datasets: [
+        { label: 'Max',  data: maxData, borderColor: '#ff4d00', borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: false },
+        { label: 'Avg',  data: avgData, borderColor: '#ffe066', borderWidth: 2,   pointRadius: 0, tension: 0.3, fill: false },
+        { label: 'Min',  data: minData, borderColor: '#42b4ff', borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: false },
+      ]
+    },
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'top', align: 'end', labels: { boxWidth: 10, padding: 16, color: '#555e75' } },
+        tooltip: {
+          backgroundColor: '#111318',
+          borderColor: '#1e2230',
+          borderWidth: 1,
+          padding: 10,
+          callbacks: {
+            title: (items) => xFmt(items[0].dataIndex),
+            label: (item) => ` ${item.dataset.label}: ${item.raw.toFixed(1)}°C`
+          }
+        }
+      },
+      scales: {
+        x: { grid: { color: '#1a1e28' }, ticks: { maxTicksLimit: 10, maxRotation: 0 } },
+        y: {
+          grid: { color: '#1a1e28' },
+          ticks: { callback: v => v.toFixed(0) + '°' },
+          title: { display: true, text: 'Temperature (°C)', color: '#555e75' }
+        }
+      }
+    }
+  });
+}
+
+// ── Clock ────────────────────────────────────────────────────────────────────
+setInterval(() => {
+  document.getElementById('clock').textContent =
+    new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}, 1000);
+
+// ── Temp color logic ─────────────────────────────────────────────────────────
+function tempColor(t) {
+  if (t < 45) return 'var(--cool)';
+  if (t < 65) return 'var(--mid)';
+  if (t < 80) return 'var(--warm)';
+  return 'var(--accent)';
+}
+function tempStatus(t) {
+  if (t < 45) return 'COOL — Normal operation';
+  if (t < 65) return 'WARM — Moderate load';
+  if (t < 80) return 'HOT — High load / check cooling';
+  return '⚠ CRITICAL — Throttling likely';
+}
+
+// ── Load current ─────────────────────────────────────────────────────────────
+async function loadCurrent() {
+  const r = await fetch('/api/current');
+  const d = await r.json();
+  const t = d.temp_c;
+  document.getElementById('tempBig').innerHTML = `${t.toFixed(1)}<span class="unit">°C</span>`;
+  document.getElementById('tempBig').style.color = tempColor(t);
+  document.getElementById('heroTime').textContent = `Last reading: ${fmtDate(d.ts)}`;
+  document.getElementById('heroStatus').textContent = tempStatus(t);
+  // status fill: map 20°C → 0%, 90°C → 100%
+  const pct = Math.min(100, Math.max(0, ((t - 20) / 70) * 100));
+  document.getElementById('statusFill').style.width = pct + '%';
+}
+
+// ── Load 24h chart ────────────────────────────────────────────────────────────
+let chart24 = null;
+async function load24h() {
+  const r = await fetch('/api/24h');
+  const data = await r.json();
+  document.getElementById('load24').style.display = 'none';
+
+  const labels  = data.map((_, i) => i);
+  const minData = data.map(d => d.min);
+  const avgData = data.map(d => d.avg);
+  const maxData = data.map(d => d.max);
+
+  if (data.length) {
+    const mn = Math.min(...minData), mx = Math.max(...maxData), av = avgData.reduce((a,b)=>a+b,0)/avgData.length;
+    document.getElementById('s24min').textContent = fmt(mn);
+    document.getElementById('s24avg').textContent = fmt(av);
+    document.getElementById('s24max').textContent = fmt(mx);
+  }
+
+  if (chart24) chart24.destroy();
+  chart24 = buildChart('chart24', labels, minData, avgData, maxData,
+    (i) => data[i] ? fmtTime(data[i].ts) : '');
+}
+
+// ── Load 7w chart ─────────────────────────────────────────────────────────────
+let chart7w = null;
+async function load7w() {
+  const r = await fetch('/api/7w');
+  const data = await r.json();
+  document.getElementById('load7w').style.display = 'none';
+
+  const labels  = data.map((_, i) => i);
+  const minData = data.map(d => d.min);
+  const avgData = data.map(d => d.avg);
+  const maxData = data.map(d => d.max);
+
+  if (data.length) {
+    const mn = Math.min(...minData), mx = Math.max(...maxData), av = avgData.reduce((a,b)=>a+b,0)/avgData.length;
+    document.getElementById('s7wmin').textContent = fmt(mn);
+    document.getElementById('s7wavg').textContent = fmt(av);
+    document.getElementById('s7wmax').textContent = fmt(mx);
+  }
+
+  if (chart7w) chart7w.destroy();
+  chart7w = buildChart('chart7w', labels, minData, avgData, maxData,
+    (i) => data[i] ? fmtDate(data[i].ts) : '');
+}
+
+// ── Info ──────────────────────────────────────────────────────────────────────
+async function loadInfo() {
+  try {
+    const r = await fetch('/api/info');
+    const d = await r.json();
+    document.getElementById('footer').textContent =
+      `ThermalWatch · ${d.total_readings.toLocaleString()} readings stored · interval ${d.interval_seconds}s · DB: ${d.db_path}`;
+  } catch {}
+}
+
+// ── Init & refresh ────────────────────────────────────────────────────────────
+async function init() {
+  await Promise.all([loadCurrent(), load24h(), load7w(), loadInfo()]);
+}
+
+init();
+// Refresh current reading every 30s, charts every 5 minutes
+setInterval(loadCurrent, 30_000);
+setInterval(() => { load24h(); load7w(); loadInfo(); }, 300_000);
+</script>
+</body>
+</html>
