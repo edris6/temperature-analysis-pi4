@@ -26,22 +26,25 @@ Reads temperature every 30 seconds, stores it locally, and serves a live web das
 
 ## Installation
 
-**1. Copy all four files to your Raspberry Pi.**
-
-You can use `scp` from another machine:
-```bash
-scp temp_service.py dashboard.html tempmonitor.service install.sh pi@<pi-ip-address>:~/tempmonitor/
-```
-
-Or transfer them via USB, or clone directly onto the Pi.
-
-**2. SSH into your Pi and navigate to the folder:**
+**1. SSH into your Raspberry Pi:**
 ```bash
 ssh pi@<pi-ip-address>
-cd ~/tempmonitor
 ```
 
-**3. Run the installer as root:**
+**2. Make sure `git` is installed:**
+```bash
+sudo apt update && sudo apt install -y git
+```
+
+**3. Clone the repository:**
+```bash
+git clone https://github.com/<your-username>/thermalwatch.git
+cd thermalwatch
+```
+
+> Replace `<your-username>` with your GitHub username.
+
+**4. Run the installer as root:**
 ```bash
 sudo bash install.sh
 ```
@@ -52,12 +55,12 @@ The installer will:
 - Register and start the systemd service
 - Enable it to run automatically on every boot
 
-**4. Find your Pi's IP address (if you don't know it):**
+**5. Find your Pi's IP address (if you don't know it):**
 ```bash
 hostname -I
 ```
 
-**5. Open the dashboard in any browser on your network:**
+**6. Open the dashboard in any browser on your network:**
 ```
 http://<pi-ip-address>:8765
 ```
