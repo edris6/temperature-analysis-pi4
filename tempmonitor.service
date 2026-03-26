@@ -1,0 +1,18 @@
+[Unit]
+Description=ThermalWatch – CPU Temperature Monitor
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/opt/tempmonitor
+ExecStart=/usr/bin/python3 /opt/tempmonitor/temp_service.py
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=tempmonitor
+
+[Install]
+WantedBy=multi-user.target
