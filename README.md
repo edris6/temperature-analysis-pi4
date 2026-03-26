@@ -38,11 +38,11 @@ sudo apt update && sudo apt install -y git
 
 **3. Clone the repository:**
 ```bash
-git clone https://github.com/<your-username>/thermalwatch.git
-cd thermalwatch
+git clone https://github.com/edris6/temperature-analysis-pi4.git
+cd temperature-analysis-pi4
 ```
 
-> Replace `<your-username>` with your GitHub username.
+
 
 **4. Run the installer as root:**
 ```bash
