@@ -5,7 +5,7 @@ Wants=network.target
 
 [Service]
 Type=simple
-User=pi
+User=YOUR_USER
 WorkingDirectory=/opt/tempmonitor
 ExecStart=/usr/bin/python3 /opt/tempmonitor/temp_service.py
 Restart=on-failure
